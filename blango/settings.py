@@ -9,12 +9,10 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
-
+import dj_database_url
 from pathlib import Path
 import os
-from configurations import Configuration
-from configurations import values
-import dj_database_url
+from configurations import Configuration, values
 
 class Dev(Configuration):
     # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,23 +24,20 @@ class Dev(Configuration):
 
     # SECURITY WARNING: keep the secret key used in production secret!
     SECRET_KEY = 'django-insecure-+sn%dpa!086+g+%44z9*^j^q-u4n!j(#wl)x9a%_1op@zz2+1-'
-    #SECRET_KEY = values.SecretValue("django-insecure-+sn%dpa!086+g+%44z9*^j^q-u4n!j(#wl)x9a%_1op@zz2+1-")
+
     # SECURITY WARNING: don't run with debug turned on in production!
-    DEBUG = False
+    DEBUG = values.BooleanValue(True)
 
     ALLOWED_HOSTS = values.ListValue(["localhost", "0.0.0.0", ".codio.io"])
     X_FRAME_OPTIONS = 'ALLOW-FROM ' + os.environ.get('CODIO_HOSTNAME') + '-8000.codio.io'
     CSRF_COOKIE_SAMESITE = None
-    CSRF_TRUSTED_ORIGINS = ['https://' + os.environ.get('CODIO_HOSTNAME') + '-8000.codio.io']
+    CSRF_TRUSTED_ORIGINS = [os.environ.get('CODIO_HOSTNAME') + '-8000.codio.io']
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SAMESITE = 'None'
     SESSION_COOKIE_SAMESITE = 'None'
-    CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
-    CRISPY_TEMPLATE_PACK = "bootstrap5"
-    AUTH_USER_MODEL = "blango_auth.User"
-    
-    INTERNAL_IPS = ["192.168.10.93"]
+
+
     # Application definition
 
     INSTALLED_APPS = [
@@ -51,16 +46,21 @@ class Dev(Configuration):
         'django.contrib.contenttypes',
         'django.contrib.sessions',
         'django.contrib.messages',
+        'django.contrib.sites',
         'django.contrib.staticfiles',
-        'blog',
         'crispy_forms',
         'crispy_bootstrap5',
         "debug_toolbar",
         'blango_auth',
+        'blog',
+        'allauth',
+        'allauth.account',
+        'allauth.socialaccount',
+        'allauth.socialaccount.providers.google',
     ]
 
     MIDDLEWARE = [
-        "debug_toolbar.middleware.DebugToolbarMiddleware",
+        'debug_toolbar.middleware.DebugToolbarMiddleware',
         'django.middleware.security.SecurityMiddleware',
         'django.contrib.sessions.middleware.SessionMiddleware',
         'django.middleware.common.CommonMiddleware',
@@ -89,24 +89,25 @@ class Dev(Configuration):
     ]
 
     WSGI_APPLICATION = 'blango.wsgi.application'
+  
 
-
-    PASSWORD_HASHERS = [
-      'django.contrib.auth.hashers.Argon2PasswordHasher',
-      'django.contrib.auth.hashers.PBKDF2PasswordHasher',
-      'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-      'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
-    ]
     # Database
     # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-    DATABASES = {
-        "default": dj_database_url.config(default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
-        "alternative": dj_database_url.config(
-            "ALTERNATIVE_DATABASE_URL",
-            default=f"sqlite:///{BASE_DIR}/alternative_db.sqlite3",
-        ),
-    }
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': BASE_DIR / 'db.sqlite3',
+#         }
+#     }
+#     DATABASES = {
+#     "default": dj_database_url.config(default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
+#     "alternative": dj_database_url.config(
+#         "ALTERNATIVE_DATABASE_URL",
+#         default=f"sqlite:///{BASE_DIR}/alternative_db.sqlite3",
+#         ),
+#     }
+    DATABASES = values.DatabaseURLValue(f"sqlite:///{BASE_DIR}/db.sqlite3")
 
 
     # Password validation
@@ -133,7 +134,7 @@ class Dev(Configuration):
 
     LANGUAGE_CODE = 'en-us'
 
-    TIME_ZONE = values.Value("UTC")
+    TIME_ZONE = TIME_ZONE = values.Value("UTC")
 
     USE_I18N = True
 
@@ -152,24 +153,66 @@ class Dev(Configuration):
 
     DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+    CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+    CRISPY_TEMPLATE_PACK = "bootstrap5"
+    
     LOGGING = {
-      "version": 1,
-      "disable_existing_loggers": False,
-      "formatters": {
-          "verbose": {
-              "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
-              "style": "{",
-          },
-      },
-      "handlers": {
-          "console": {
-              "class": "logging.StreamHandler",
-              "stream": "ext://sys.stdout",
-              "formatter": "verbose",
-          },
-      },
-      "root": {
-          "handlers": ["console"],
-          "level": "DEBUG",
-      },
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "require_debug_false": {
+                "()": "django.utils.log.RequireDebugFalse",
+            },
+        },
+        "formatters": {
+            "verbose": {
+                "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+                "style": "{",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+                "formatter": "verbose",
+            },
+            "mail_admins": {
+                "level": "ERROR",
+                "class": "django.utils.log.AdminEmailHandler",
+                "filters": ["require_debug_false"],
+            },
+        },
+        "loggers": {
+            "django.request": {
+                "handlers": ["mail_admins"],
+                "level": "ERROR",
+                "propagate": True,
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
     }
+    
+    PASSWORD_HASHERS = [
+        'django.contrib.auth.hashers.Argon2PasswordHasher',
+        'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+        'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+        'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+    ]
+    
+    INTERNAL_IPS = ["192.168.10.226"]
+    AUTH_USER_MODEL = "blango_auth.User"
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    ACCOUNT_ACTIVATION_DAYS = 7
+    SITE_ID = 1
+    
+    ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+    ACCOUNT_EMAIL_REQUIRED = True
+    ACCOUNT_USERNAME_REQUIRED = False
+    ACCOUNT_AUTHENTICATION_METHOD = "email"
+
+class Prod(Dev):
+    DEBUG = False
+    SECRET_KEY = values.SecretValue()
